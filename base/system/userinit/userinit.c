@@ -233,11 +233,47 @@ StartProcess(
 }
 
 static BOOL
+IsDesktopThemeActive(VOID)
+{
+    HKEY Key;
+    WCHAR ThemeActive[2];
+    DWORD Type = 0, Size = sizeof(ThemeActive);
+    BOOL Active = FALSE;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ThemeManager",
+                      0,
+                      KEY_QUERY_VALUE,
+                      &Key) == ERROR_SUCCESS)
+    {
+        if (RegQueryValueExW(Key,
+                             L"ThemeActive",
+                             NULL,
+                             &Type,
+                             (LPBYTE)ThemeActive,
+                             &Size) == ERROR_SUCCESS &&
+            Type == REG_SZ)
+        {
+            Active = ThemeActive[0] != L'0';
+        }
+        RegCloseKey(Key);
+    }
+
+    return Active;
+}
+
+static BOOL
 StartDesktopCompositor(
     _In_opt_ PVOID pEnvironment)
 {
     WCHAR DwmPath[MAX_PATH];
     UINT Length;
+
+    if (!IsDesktopThemeActive())
+    {
+        TRACE("Desktop themes are disabled; not starting the compositor\n");
+        return TRUE;
+    }
 
     Length = GetSystemDirectoryW(DwmPath, ARRAYSIZE(DwmPath));
     if (Length == 0 || Length >= ARRAYSIZE(DwmPath) ||

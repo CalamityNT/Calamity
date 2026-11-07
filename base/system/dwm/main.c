@@ -43,6 +43,8 @@ static const WCHAR DwmPoliciesKey[] = L"Software\\Policies\\Microsoft\\Windows\\
 static const WCHAR DwmPersonalizeKey[] =
     L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
 
+static BOOL DwmIsThemeActive(VOID);
+
 static HRESULT
 DwmUninitializeEngine(HMIL_CONNECTION *Connection)
 {
@@ -120,6 +122,14 @@ DwmNotificationWindowProc(HWND Window, UINT Message, WPARAM WParam,
         case WM_SETTINGCHANGE:
         case WM_SYSCOLORCHANGE:
         case WM_THEMECHANGED:
+            if (!DwmIsThemeActive())
+            {
+                DestroyWindow(Window);
+                return 0;
+            }
+            DwmSignalComposition();
+            return 0;
+
         case WM_DWMCOMPOSITIONCHANGED:
             DwmSignalComposition();
             return 0;
@@ -170,6 +180,21 @@ DwmQueryRegistryValue(HKEY Root, const WCHAR *SubKey, const WCHAR *Name,
     if (Type != ExpectedType)
         return HRESULT_FROM_WIN32(ERROR_DATATYPE_MISMATCH);
     return S_OK;
+}
+
+static BOOL
+DwmIsThemeActive(VOID)
+{
+    WCHAR ThemeActive[2];
+    DWORD Bytes = sizeof(ThemeActive);
+
+    return SUCCEEDED(DwmQueryRegistryValue(
+        HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\ThemeManager",
+        L"ThemeActive",
+        REG_SZ,
+        ThemeActive,
+        &Bytes)) && ThemeActive[0] != L'0';
 }
 
 static HRESULT STDMETHODCALLTYPE
@@ -367,6 +392,9 @@ wWinMain(HINSTANCE Instance, HINSTANCE PreviousInstance,
     UNREFERENCED_PARAMETER(PreviousInstance);
     UNREFERENCED_PARAMETER(CommandLine);
     UNREFERENCED_PARAMETER(ShowCommand);
+
+    if (!DwmIsThemeActive())
+        return 0;
 
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
     /* Composition must not wait behind applications' queued GPU work. */

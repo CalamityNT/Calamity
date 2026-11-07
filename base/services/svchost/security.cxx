@@ -166,8 +166,8 @@ InitializeSecurity (
     )
 {
     HRESULT hr;
-    PACL pAcl;
-    PSECURITY_DESCRIPTOR pSecurityDescriptor;
+    PACL pAcl = NULL;
+    PSECURITY_DESCRIPTOR pSecurityDescriptor = NULL;
     IGlobalOptions *pGlobalOptions;
     ASSERT(dwParam != 0);
 
