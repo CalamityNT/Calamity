@@ -1154,7 +1154,7 @@ static void show_taskbar_properties(void)
     ZeroMemory( &cls, sizeof(cls) );
     cls.lpfnWndProc = taskbar_properties_wndproc;
     cls.hInstance = GetModuleHandleW( NULL );
-    cls.hCursor = LoadCursorW( NULL, IDC_ARROW );
+    cls.hCursor = LoadCursorW( NULL, MAKEINTRESOURCEW( IDC_ARROW ) );
     cls.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     cls.lpszClassName = L"WineTaskbarProperties";
     RegisterClassW( &cls );
@@ -1198,8 +1198,8 @@ static void show_taskbar_contextmenu( HWND button, LPARAM lparam )
         AppendMenuW( menu, MF_STRING, TASKBAR_MENU_PROPERTIES, L"Properties" );
         AppendMenuW( menu, MF_STRING, TASKBAR_MENU_EXPLORER, L"Open Explorer" );
 
-        point.x = GET_X_LPARAM( lparam );
-        point.y = GET_Y_LPARAM( lparam );
+        point.x = (short)LOWORD( lparam );
+        point.y = (short)HIWORD( lparam );
         if (point.x == -1 || point.y == -1)
         {
             GetWindowRect( button, &rect );
