@@ -107,6 +107,7 @@ struct taskbar_button
 static struct list taskbar_buttons = LIST_INIT( taskbar_buttons );
 
 static HWND tray_window;
+static HWND taskbar_properties_window;
 static HWINEVENTHOOK window_event_hook;
 static BOOL taskbar_appbar_registered;
 static BOOL taskbar_workarea_reserved;
@@ -167,6 +168,13 @@ static void do_show_systray(void);
 static void update_taskbar_workarea(void);
 static struct taskbar_button *find_taskbar_button( HWND hwnd );
 static void remove_taskbar_button( HWND hwnd );
+static void move_taskbar_to_edge(UINT edge);
+
+#define TASKBAR_MENU_PROPERTIES 1
+#define TASKBAR_MENU_EXPLORER   2
+#define TASKBAR_PROPERTIES_TOP  100
+#define TASKBAR_PROPERTIES_BOTTOM 101
+#define TASKBAR_PROPERTIES_CLOSE 102
 
 /* Retrieves icon record by owner window and ID */
 static struct icon *get_icon(HWND owner, UINT id)
@@ -1090,11 +1098,128 @@ static void click_taskbar_button( HWND button )
     SetForegroundWindow( hwnd );
 }
 
+static LRESULT CALLBACK taskbar_properties_wndproc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
+{
+    switch (msg)
+    {
+    case WM_CREATE:
+        CreateWindowW( WC_BUTTONW, L"Top", WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON | WS_GROUP,
+                       16, 16, 120, 24, hwnd, (HMENU)TASKBAR_PROPERTIES_TOP, NULL, NULL );
+        CreateWindowW( WC_BUTTONW, L"Bottom", WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+                       16, 44, 120, 24, hwnd, (HMENU)TASKBAR_PROPERTIES_BOTTOM, NULL, NULL );
+        CreateWindowW( WC_BUTTONW, L"Close", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+                       150, 42, 80, 26, hwnd, (HMENU)TASKBAR_PROPERTIES_CLOSE, NULL, NULL );
+        CheckRadioButton( hwnd, TASKBAR_PROPERTIES_TOP, TASKBAR_PROPERTIES_BOTTOM,
+                          taskbar_edge == ABE_TOP ? TASKBAR_PROPERTIES_TOP : TASKBAR_PROPERTIES_BOTTOM );
+        return 0;
+
+    case WM_COMMAND:
+        switch (LOWORD(wparam))
+        {
+        case TASKBAR_PROPERTIES_TOP:
+            move_taskbar_to_edge( ABE_TOP );
+            break;
+        case TASKBAR_PROPERTIES_BOTTOM:
+            move_taskbar_to_edge( ABE_BOTTOM );
+            break;
+        case TASKBAR_PROPERTIES_CLOSE:
+            DestroyWindow( hwnd );
+            break;
+        }
+        return 0;
+
+    case WM_CLOSE:
+        DestroyWindow( hwnd );
+        return 0;
+
+    case WM_DESTROY:
+        taskbar_properties_window = NULL;
+        return 0;
+    }
+
+    return DefWindowProcW( hwnd, msg, wparam, lparam );
+}
+
+static void show_taskbar_properties(void)
+{
+    WNDCLASSW cls;
+    HWND hwnd;
+
+    if (taskbar_properties_window)
+    {
+        SetForegroundWindow( taskbar_properties_window );
+        return;
+    }
+
+    ZeroMemory( &cls, sizeof(cls) );
+    cls.lpfnWndProc = taskbar_properties_wndproc;
+    cls.hInstance = GetModuleHandleW( NULL );
+    cls.hCursor = LoadCursorW( NULL, IDC_ARROW );
+    cls.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+    cls.lpszClassName = L"WineTaskbarProperties";
+    RegisterClassW( &cls );
+
+    hwnd = CreateWindowExW( WS_EX_DLGMODALFRAME, cls.lpszClassName, L"Taskbar Properties",
+                            WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT,
+                            250, 120, tray_window, NULL, cls.hInstance, NULL );
+    if (!hwnd)
+    {
+        ERR( "failed to create taskbar properties window, error %lu\n", GetLastError() );
+        return;
+    }
+
+    taskbar_properties_window = hwnd;
+    ShowWindow( hwnd, SW_SHOW );
+    UpdateWindow( hwnd );
+}
+
 static void show_taskbar_contextmenu( HWND button, LPARAM lparam )
 {
     ULONG_PTR id = GetWindowLongPtrW( button, GWLP_ID );
 
-    if (id) SendNotifyMessageW( (HWND)id, WM_POPUPSYSTEMMENU, 0, lparam );
+    if (id)
+    {
+        SendNotifyMessageW( (HWND)id, WM_POPUPSYSTEMMENU, 0, lparam );
+        return;
+    }
+
+    {
+        HMENU menu = CreatePopupMenu();
+        POINT point;
+        RECT rect;
+        UINT command;
+
+        if (!menu)
+        {
+            ERR( "failed to create taskbar context menu, error %lu\n", GetLastError() );
+            return;
+        }
+
+        AppendMenuW( menu, MF_STRING, TASKBAR_MENU_PROPERTIES, L"Properties" );
+        AppendMenuW( menu, MF_STRING, TASKBAR_MENU_EXPLORER, L"Open Explorer" );
+
+        point.x = GET_X_LPARAM( lparam );
+        point.y = GET_Y_LPARAM( lparam );
+        if (point.x == -1 || point.y == -1)
+        {
+            GetWindowRect( button, &rect );
+            point.x = rect.left;
+            point.y = rect.bottom;
+        }
+
+        SetForegroundWindow( tray_window );
+        command = TrackPopupMenu( menu, TPM_RETURNCMD | TPM_NONOTIFY,
+                                  point.x, point.y, 0, tray_window, NULL );
+        DestroyMenu( menu );
+
+        if (command == TASKBAR_MENU_PROPERTIES)
+            show_taskbar_properties();
+        else if (command == TASKBAR_MENU_EXPLORER)
+        {
+            if ((ULONG_PTR)ShellExecuteW( NULL, L"open", L"winefile.exe", NULL, NULL, SW_SHOWNORMAL ) <= 32)
+                ERR( "failed to launch winefile.exe, error %lu\n", GetLastError() );
+        }
+    }
 }
 
 static void do_hide_systray(void)
