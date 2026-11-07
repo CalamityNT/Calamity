@@ -1,5 +1,5 @@
 clb base\applications\regedit\clb
-notifyhook base\shell\explorer\notifyhook
+notifyhook explorer\notifyhook
 mesa32 dll\3rdparty\mesa32
 access dll\cpl\access
 appwiz dll\cpl\appwiz

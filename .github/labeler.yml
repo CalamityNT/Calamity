@@ -33,7 +33,7 @@ ROSTESTS:
 shell:
 - changed-files:
   - any-glob-to-any-file:
-    - base/shell/explorer/**
+    - explorer/**
     - base/shell/rshell/**
     - dll/shellext/**
     - dll/win32/browseui/**

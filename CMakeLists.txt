@@ -409,6 +409,7 @@ Enable this if the module uses typeid or dynamic_cast. You will probably need to
     add_subdirectory(boot)
     add_subdirectory(bootloader)
     add_subdirectory(base)
+    add_subdirectory(explorer)
     add_subdirectory(dll)
     set(FEX_ARM64EC_AVAILABLE OFF)
     add_subdirectory(submodules)

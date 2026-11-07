@@ -520,7 +520,7 @@ HRESULT STDMETHODCALLTYPE CShellDispatch::AddToRecent(VARIANT file, BSTR categor
 
 
 // *** IShellDispatch4 methods ***
-#define IDM_SECURITY 5001 // From base/shell/explorer/resource.h
+#define IDM_SECURITY 5001 // From explorer/resource.h
 HRESULT STDMETHODCALLTYPE CShellDispatch::WindowsSecurity()
 {
     TRACE("(%p)\n", this);
@@ -607,4 +607,3 @@ HRESULT WINAPI CShellDispatch_Constructor(REFIID riid, LPVOID * ppvOut)
 {
     return ShellObjectCreatorInit<CShellDispatch>(riid, ppvOut);
 }
-
