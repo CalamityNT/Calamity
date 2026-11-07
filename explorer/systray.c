@@ -19,6 +19,7 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include <windows.h>
 #include <ntuser.h>
@@ -107,6 +108,11 @@ static struct list taskbar_buttons = LIST_INIT( taskbar_buttons );
 
 static HWND tray_window;
 static HWINEVENTHOOK window_event_hook;
+static BOOL taskbar_appbar_registered;
+static BOOL taskbar_workarea_reserved;
+static UINT taskbar_edge = ABE_BOTTOM;
+static BOOL taskbar_dragging;
+static POINT taskbar_drag_start;
 
 static unsigned int nb_displayed;
 
@@ -158,6 +164,7 @@ static WNDCLASSEXW tray_icon_class =
 
 static void do_hide_systray(void);
 static void do_show_systray(void);
+static void update_taskbar_workarea(void);
 static struct taskbar_button *find_taskbar_button( HWND hwnd );
 static void remove_taskbar_button( HWND hwnd );
 
@@ -1128,9 +1135,55 @@ static void do_show_systray(void)
     tray_width = GetSystemMetrics( SM_CXSCREEN );
     tray_height = max( icon_cy, size.cy );
     start_button_width = size.cx;
-    SetWindowPos( tray_window, 0, 0, GetSystemMetrics( SM_CYSCREEN ) - tray_height,
-                  tray_width, tray_height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW );
+    SetWindowPos( tray_window, HWND_TOPMOST, 0,
+                  taskbar_edge == ABE_TOP ? 0 : GetSystemMetrics( SM_CYSCREEN ) - tray_height,
+                  tray_width, tray_height, SWP_NOACTIVATE | SWP_SHOWWINDOW );
+    update_taskbar_workarea();
     sync_taskbar_buttons();
+}
+
+static void update_taskbar_workarea(void)
+{
+    APPBARDATA appbar;
+    RECT work_rect;
+
+    if (!enable_taskbar || !tray_window) return;
+
+    ZeroMemory( &appbar, sizeof(appbar) );
+    appbar.cbSize = sizeof(appbar);
+    appbar.hWnd = tray_window;
+    appbar.uEdge = taskbar_edge;
+    appbar.rc.left = 0;
+    appbar.rc.top = taskbar_edge == ABE_TOP ? 0 : GetSystemMetrics( SM_CYSCREEN ) - tray_height;
+    appbar.rc.right = GetSystemMetrics( SM_CXSCREEN );
+    appbar.rc.bottom = appbar.rc.top + tray_height;
+
+    if (taskbar_appbar_registered && SHAppBarMessage( ABM_SETPOS, &appbar ))
+    {
+        SetWindowPos( tray_window, HWND_TOPMOST,
+                      appbar.rc.left, appbar.rc.top,
+                      appbar.rc.right - appbar.rc.left,
+                      appbar.rc.bottom - appbar.rc.top,
+                      SWP_NOACTIVATE | SWP_SHOWWINDOW );
+    }
+
+    SetRect( &work_rect, 0, 0, GetSystemMetrics( SM_CXSCREEN ), GetSystemMetrics( SM_CYSCREEN ) );
+    if (taskbar_edge == ABE_TOP)
+        work_rect.top += tray_height;
+    else
+        work_rect.bottom -= tray_height;
+    taskbar_workarea_reserved = SystemParametersInfoW( SPI_SETWORKAREA, 0, &work_rect,
+                                                       SPIF_SENDCHANGE ) != FALSE;
+}
+
+static void move_taskbar_to_edge(UINT edge)
+{
+    if (!enable_taskbar || (edge != ABE_TOP && edge != ABE_BOTTOM) ||
+        taskbar_edge == edge)
+        return;
+
+    taskbar_edge = edge;
+    do_show_systray();
 }
 
 static LRESULT WINAPI shell_traywnd_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
@@ -1143,6 +1196,70 @@ static LRESULT WINAPI shell_traywnd_proc( HWND hwnd, UINT msg, WPARAM wparam, LP
     case WM_DISPLAYCHANGE:
         if (!enable_taskbar && (!show_systray || !nb_displayed)) do_hide_systray();
         else do_show_systray();
+        break;
+
+    case WM_USER + 2:
+        if (wparam == ABN_POSCHANGED)
+            do_show_systray();
+        break;
+
+    case WM_LBUTTONDOWN:
+        if (enable_taskbar)
+        {
+            GetCursorPos( &taskbar_drag_start );
+            taskbar_dragging = FALSE;
+            SetCapture( hwnd );
+            return 0;
+        }
+        break;
+
+    case WM_MOUSEMOVE:
+        if (enable_taskbar && GetCapture() == hwnd &&
+            (wparam & MK_LBUTTON))
+        {
+            POINT cursor;
+            GetCursorPos( &cursor );
+            if (abs( cursor.y - taskbar_drag_start.y ) >= GetSystemMetrics( SM_CYDRAG ))
+                taskbar_dragging = TRUE;
+            return 0;
+        }
+        break;
+
+    case WM_LBUTTONUP:
+        if (enable_taskbar && GetCapture() == hwnd)
+        {
+            POINT cursor;
+            GetCursorPos( &cursor );
+            ReleaseCapture();
+            if (taskbar_dragging)
+                move_taskbar_to_edge(cursor.y < GetSystemMetrics( SM_CYSCREEN ) / 2 ?
+                                     ABE_TOP : ABE_BOTTOM);
+            taskbar_dragging = FALSE;
+            return 0;
+        }
+        break;
+
+    case WM_CAPTURECHANGED:
+        taskbar_dragging = FALSE;
+        break;
+
+    case WM_DESTROY:
+        if (taskbar_appbar_registered || taskbar_workarea_reserved)
+        {
+            APPBARDATA appbar;
+            RECT work_rect;
+            ZeroMemory( &appbar, sizeof(appbar) );
+            appbar.cbSize = sizeof(appbar);
+            appbar.hWnd = hwnd;
+            if (taskbar_appbar_registered)
+            {
+                SHAppBarMessage( ABM_REMOVE, &appbar );
+                taskbar_appbar_registered = FALSE;
+            }
+            SetRect( &work_rect, 0, 0, GetSystemMetrics( SM_CXSCREEN ), GetSystemMetrics( SM_CYSCREEN ) );
+            SystemParametersInfoW( SPI_SETWORKAREA, 0, &work_rect, SPIF_SENDCHANGE );
+            taskbar_workarea_reserved = FALSE;
+        }
         break;
 
     case WM_WINDOWPOSCHANGING:
@@ -1269,6 +1386,7 @@ void initialize_systray( BOOL arg_using_root, BOOL arg_enable_shell, BOOL arg_sh
     }
 
     no_tray_items = arg_no_tray_items;
+    taskbar_edge = ABE_BOTTOM;
 
     /* register the systray listener window class */
     if (!RegisterClassExW( &shell_traywnd_class ))
@@ -1288,8 +1406,10 @@ void initialize_systray( BOOL arg_using_root, BOOL arg_enable_shell, BOOL arg_sh
         SetRect( &primary_rect, 0, 0, GetSystemMetrics( SM_CXSCREEN ), GetSystemMetrics( SM_CYSCREEN ) );
         SubtractRect( &taskbar_rect, &primary_rect, &work_rect );
 
-        tray_window = CreateWindowExW( WS_EX_NOACTIVATE, shell_traywnd_class.lpszClassName, NULL, WS_POPUP,
-                                       taskbar_rect.left, taskbar_rect.top, taskbar_rect.right - taskbar_rect.left,
+        tray_window = CreateWindowExW( WS_EX_NOACTIVATE | WS_EX_TOPMOST,
+                                       shell_traywnd_class.lpszClassName, NULL, WS_POPUP,
+                                       taskbar_rect.left, taskbar_rect.top,
+                                       taskbar_rect.right - taskbar_rect.left,
                                        taskbar_rect.bottom - taskbar_rect.top, 0, 0, 0, 0 );
     }
     else
@@ -1312,6 +1432,12 @@ void initialize_systray( BOOL arg_using_root, BOOL arg_enable_shell, BOOL arg_sh
 
     if (enable_taskbar)
     {
+        APPBARDATA appbar;
+        ZeroMemory( &appbar, sizeof(appbar) );
+        appbar.cbSize = sizeof(appbar);
+        appbar.hWnd = tray_window;
+        appbar.uCallbackMessage = WM_USER + 2;
+        taskbar_appbar_registered = SHAppBarMessage( ABM_NEW, &appbar ) != FALSE;
         EnumWindows( enum_windows_proc, 0 );
         window_event_hook = SetWinEventHook( EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_HIDE, 0,
                                              window_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT );

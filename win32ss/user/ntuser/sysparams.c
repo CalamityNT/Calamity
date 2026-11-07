@@ -1010,15 +1010,23 @@ SpiSetWallpaper(PVOID pvParam, FLONG fl, HBITMAP hbmSupplied)
 
     if (!pvParam)
     {
-        /* FIXME: Reset Wallpaper to registry value */
-        return (UINT_PTR)KEY_DESKTOP;
+        RtlZeroMemory(awc, sizeof(awc));
+        RegReadUserSetting(KEY_DESKTOP,
+                           L"Wallpaper",
+                           REG_SZ,
+                           awc,
+                           sizeof(awc));
+        RtlInitUnicodeString(&ustr, awc);
+        pvParam = &ustr;
     }
-
-    /* Capture UNICODE_STRING */
-    bResult = SpiMemCopy(&ustr, pvParam, sizeof(ustr), fl & SPIF_PROTECT);
-    if (!bResult)
+    else
     {
-        return 0;
+        /* Capture UNICODE_STRING */
+        bResult = SpiMemCopy(&ustr, pvParam, sizeof(ustr), fl & SPIF_PROTECT);
+        if (!bResult)
+        {
+            return 0;
+        }
     }
     if (ustr.Length > MAX_PATH * sizeof(WCHAR) || (ustr.Length % sizeof(WCHAR)) != 0)
     {
