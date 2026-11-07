@@ -25,6 +25,9 @@
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 #endif
 
+#include <imm32_undoc.h>
+#include <reactos/undocuser.h>
+
 extern void manage_desktop( WCHAR *arg );
 extern void initialize_systray( BOOL using_root, BOOL enable_shell, BOOL show_systray, BOOL no_tray_items );
 extern void initialize_appbar(void);

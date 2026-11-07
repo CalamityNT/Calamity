@@ -32,6 +32,7 @@
 #include <shobjidl.h>
 #include <shlobj.h>
 #include <shlwapi.h>
+#include <exdisp.h>
 #include <commoncontrols.h>
 #include <commctrl.h>
 
