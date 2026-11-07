@@ -206,7 +206,7 @@ ScmLogEvent(DWORD dwEventId,
 VOID
 ScmWaitForLsa(VOID)
 {
-    HANDLE hEvent = CreateEventW(NULL, TRUE, FALSE, L"LSA_RPC_SERVER_ACTIVE");
+    HANDLE hEvent = CreateEventW(NULL, TRUE, FALSE, L"Global\\LSA_RPC_SERVER_ACTIVE");
     if (hEvent == NULL)
     {
         DPRINT1("Failed to create or open the notification event (Error %lu)\n", GetLastError());

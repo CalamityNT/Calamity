@@ -80,7 +80,7 @@ LsarStartRpcServer(VOID)
     hEvent = CreateEventW(NULL,
                           TRUE,
                           FALSE,
-                          L"LSA_RPC_SERVER_ACTIVE");
+                          L"Global\\LSA_RPC_SERVER_ACTIVE");
     if (hEvent == NULL)
     {
         dwError = GetLastError();
@@ -90,7 +90,7 @@ LsarStartRpcServer(VOID)
         {
             hEvent = OpenEventW(GENERIC_WRITE,
                                 FALSE,
-                                L"LSA_RPC_SERVER_ACTIVE");
+                                L"Global\\LSA_RPC_SERVER_ACTIVE");
             if (hEvent == NULL)
             {
                ERR("Could not open the notification event (Error %lu)\n", GetLastError());
