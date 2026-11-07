@@ -880,42 +880,6 @@ WaitForDeviceInstall(
     return WaitResult;
 }
 
-static LONG
-ReadRegSzKey(
-    IN HKEY hKey,
-    IN LPCWSTR pszKey,
-    OUT LPWSTR* pValue)
-{
-    LONG rc;
-    DWORD dwType;
-    DWORD cbData = 0;
-    LPWSTR pwszValue;
-
-    if (!pValue)
-        return ERROR_INVALID_PARAMETER;
-
-    *pValue = NULL;
-    rc = RegQueryValueExW(hKey, pszKey, NULL, &dwType, NULL, &cbData);
-    if (rc != ERROR_SUCCESS)
-        return rc;
-    if (dwType != REG_SZ)
-        return ERROR_FILE_NOT_FOUND;
-    pwszValue = HeapAlloc(GetProcessHeap(), 0, cbData + sizeof(WCHAR));
-    if (!pwszValue)
-        return ERROR_NOT_ENOUGH_MEMORY;
-    rc = RegQueryValueExW(hKey, pszKey, NULL, NULL, (LPBYTE)pwszValue, &cbData);
-    if (rc != ERROR_SUCCESS)
-    {
-        HeapFree(GetProcessHeap(), 0, pwszValue);
-        return rc;
-    }
-    /* NULL-terminate the string */
-    pwszValue[cbData / sizeof(WCHAR)] = '\0';
-
-    *pValue = pwszValue;
-    return ERROR_SUCCESS;
-}
-
 static VOID
 PreprocessUnattend(VOID)
 {
