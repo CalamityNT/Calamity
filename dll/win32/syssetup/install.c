@@ -916,51 +916,6 @@ ReadRegSzKey(
     return ERROR_SUCCESS;
 }
 
-static BOOL
-IsConsoleBoot(VOID)
-{
-    HKEY hControlKey = NULL;
-    LPWSTR pwszSystemStartOptions = NULL;
-    LPWSTR pwszCurrentOption, pwszNextOption; /* Pointers into SystemStartOptions */
-    BOOL bConsoleBoot = FALSE;
-    LONG rc;
-
-    rc = RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-                       L"SYSTEM\\CurrentControlSet\\Control",
-                       0,
-                       KEY_QUERY_VALUE,
-                       &hControlKey);
-    if (rc != ERROR_SUCCESS)
-        goto cleanup;
-
-    rc = ReadRegSzKey(hControlKey, L"SystemStartOptions", &pwszSystemStartOptions);
-    if (rc != ERROR_SUCCESS)
-        goto cleanup;
-
-    /* Check for CONSOLE switch in SystemStartOptions */
-    pwszCurrentOption = pwszSystemStartOptions;
-    while (pwszCurrentOption)
-    {
-        pwszNextOption = wcschr(pwszCurrentOption, L' ');
-        if (pwszNextOption)
-            *pwszNextOption = L'\0';
-        if (_wcsicmp(pwszCurrentOption, L"CONSOLE") == 0)
-        {
-            DPRINT("Found %S. Switching to console boot\n", pwszCurrentOption);
-            bConsoleBoot = TRUE;
-            goto cleanup;
-        }
-        pwszCurrentOption = pwszNextOption ? pwszNextOption + 1 : NULL;
-    }
-
-cleanup:
-    if (hControlKey != NULL)
-        RegCloseKey(hControlKey);
-    if (pwszSystemStartOptions)
-        HeapFree(GetProcessHeap(), 0, pwszSystemStartOptions);
-    return bConsoleBoot;
-}
-
 static VOID
 PreprocessUnattend(VOID)
 {
@@ -999,7 +954,7 @@ CommonInstall(VOID)
 {
     ULONG InstalledDevices = 0;
     ULONG TotalDevices = 0;
-    BOOL ShowStatus = !IsConsoleBoot();
+    BOOL ShowStatus = FALSE;
     BOOL bResult = FALSE;
 
     if (ShowStatus)

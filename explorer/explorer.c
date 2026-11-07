@@ -924,16 +924,12 @@ int WINAPI wWinMain(HINSTANCE hinstance,
 
     memset(&parameters,0,sizeof(parameters));
     explorer_hInstance = hinstance;
-    parse_command_line(cmdline,&parameters);
     hres = OleInitialize(NULL);
     if(FAILED(hres))
     {
         ERR( "Could not initialize COM\n" );
         ExitProcess(EXIT_FAILURE);
     }
-    if(parameters.root[0] && !PathIsDirectoryW(parameters.root))
-        if(ShellExecuteW(NULL,NULL,parameters.root,NULL,NULL,SW_SHOWDEFAULT) > (HINSTANCE)32)
-            ExitProcess(EXIT_SUCCESS);
     init_info.dwSize = sizeof(INITCOMMONCONTROLSEX);
     init_info.dwICC = ICC_USEREX_CLASSES | ICC_BAR_CLASSES | ICC_COOL_CLASSES;
     if(!InitCommonControlsEx(&init_info))
@@ -941,6 +937,10 @@ int WINAPI wWinMain(HINSTANCE hinstance,
         ERR( "Could not initialize Comctl\n" );
         ExitProcess(EXIT_FAILURE);
     }
+    parse_command_line(cmdline,&parameters);
+    if(parameters.root[0] && !PathIsDirectoryW(parameters.root))
+        if(ShellExecuteW(NULL,NULL,parameters.root,NULL,NULL,SW_SHOWDEFAULT) > (HINSTANCE)32)
+            ExitProcess(EXIT_SUCCESS);
     register_explorer_window_class();
     make_explorer_window(&parameters);
     return 0;
