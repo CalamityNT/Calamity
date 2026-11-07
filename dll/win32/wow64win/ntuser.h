@@ -711,7 +711,9 @@ struct ntuser_name_list
     WCHAR strings[1];
 };
 
+#ifndef WM_SYSTIMER
 #define WM_SYSTIMER  0x0118
+#endif
 
 /* NtUserQueryWindow info classes */
 typedef enum _WINDOWINFOCLASS

@@ -125,6 +125,7 @@ extern "C" {
 #define NIF_GUID	32
 #define NIIF_ICON_MASK	0xf
 #define NIIF_NOSOUND	0x10
+#define NIIF_LARGE_ICON	0x20
 #endif /* _WIN32_IE >= 0x0600 */
 #endif /* _WIN32_IE >= 0x0500 */
 

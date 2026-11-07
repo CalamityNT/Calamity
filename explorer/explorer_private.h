@@ -25,6 +25,7 @@
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 #endif
 
+#include <windows.h>
 #include <imm32_undoc.h>
 #include <reactos/undocuser.h>
 
