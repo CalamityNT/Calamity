@@ -1001,7 +1001,10 @@ SpiSetWallpaper(PVOID pvParam, FLONG fl, HBITMAP hbmSupplied)
 {
     UNICODE_STRING ustr;
     WCHAR awc[MAX_PATH];
+    WCHAR awcExpanded[MAX_PATH];
     WCHAR awcCaptured[MAX_PATH + 1];
+    UNICODE_STRING ustrExpanded;
+    ULONG ulExpandedLength;
     BOOL bResult;
     HBITMAP hbmp, hOldBitmap;
     SURFACE *psurfBmp;
@@ -1011,11 +1014,33 @@ SpiSetWallpaper(PVOID pvParam, FLONG fl, HBITMAP hbmSupplied)
     if (!pvParam)
     {
         RtlZeroMemory(awc, sizeof(awc));
-        RegReadUserSetting(KEY_DESKTOP,
-                           L"Wallpaper",
-                           REG_SZ,
-                           awc,
-                           sizeof(awc));
+        if (RegReadUserSetting(KEY_DESKTOP,
+                               L"Wallpaper",
+                               REG_EXPAND_SZ,
+                               awc,
+                               sizeof(awc)))
+        {
+            RtlInitUnicodeString(&ustr, awc);
+            RtlInitEmptyUnicodeString(&ustrExpanded,
+                                      awcExpanded,
+                                      sizeof(awcExpanded));
+            if (NT_SUCCESS(RtlExpandEnvironmentStrings_U(NULL,
+                                                          &ustr,
+                                                          &ustrExpanded,
+                                                          &ulExpandedLength)))
+            {
+                RtlCopyMemory(awc, awcExpanded, ustrExpanded.Length);
+                awc[ustrExpanded.Length / sizeof(WCHAR)] = UNICODE_NULL;
+            }
+        }
+        else
+        {
+            RegReadUserSetting(KEY_DESKTOP,
+                               L"Wallpaper",
+                               REG_SZ,
+                               awc,
+                               sizeof(awc));
+        }
         RtlInitUnicodeString(&ustr, awc);
         pvParam = &ustr;
     }

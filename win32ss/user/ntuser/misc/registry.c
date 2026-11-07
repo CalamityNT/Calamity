@@ -201,6 +201,7 @@ RegReadUserSetting(
     HKEY hkey;
     PKEY_VALUE_PARTIAL_INFORMATION pInfo;
     ULONG cbInfoSize, cbReqSize;
+    BOOL bTypeMatch = FALSE;
 
     /* Get the path of the current user's profile */
     Status = RtlFormatCurrentUserKeyPath(&usCurrentUserKey);
@@ -279,6 +280,7 @@ RegReadUserSetting(
         /* Did we get the right type */
         if (pInfo->Type == ulType)
         {
+            bTypeMatch = TRUE;
             /* Copy the contents to the caller */
             RtlCopyMemory(pvData, pInfo->Data, cbDataSize);
         }
@@ -289,7 +291,7 @@ RegReadUserSetting(
     if (pInfo != (PVOID)awcBuffer)
         ExFreePoolWithTag(pInfo, TAG_TEMP);
 
-    return NT_SUCCESS(Status);
+    return NT_SUCCESS(Status) && bTypeMatch;
 }
 
 _Success_(return != FALSE)
