@@ -2433,70 +2433,22 @@ IntPaintDesktopContent(HDC hDC)
         {
             Status = STATUS_SUCCESS;
         }
-        if (NT_SUCCESS(Status) && *wszzVersion)
+        if (NT_SUCCESS(Status) && *wszzVersion && InSafeMode)
         {
-            if (!InSafeMode)
+            if (hFont1) NtGdiSelectFont(hDC, hFont1);
+
+            /* Safe Mode: single version information text in top center */
+            len = wcslen(wszzVersion);
+
+            IntGdiSetTextAlign(hDC, TA_CENTER | TA_TOP);
+            GreExtTextOutW(hDC, (Rect.right + Rect.left)/2, Rect.top + 3, 0, NULL, wszzVersion, len, NULL, 0);
+            if (*s_wszAssistance)
             {
                 SIZE Size = {0, 0};
-                LONG TotalHeight = 0;
 
-                /* Normal Mode: multiple version information text separated by newlines */
-                IntGdiSetTextAlign(hDC, TA_RIGHT | TA_BOTTOM);
-
-                /* Compute the heights of the strings */
-                if (hFont1) NtGdiSelectFont(hDC, hFont1);
-                for (i = 0; i < ARRAYSIZE(VerStrs); ++i)
-                {
-                    if (!VerStrs[i].lpstr || !*VerStrs[i].lpstr || (VerStrs[i].n == 0))
-                        break;
-
-                    GreGetTextExtentW(hDC, VerStrs[i].lpstr, VerStrs[i].n, &Size, 1);
-                    VerStrs[i].y = Size.cy; // Store the string height
-                    TotalHeight += Size.cy;
-
-                    /* While the first string was using hFont1, all the others use hFont2 */
-                    if (hFont2) NtGdiSelectFont(hDC, hFont2);
-                }
-                /* The total height must not exceed the screen height */
-                TotalHeight = min(TotalHeight, Rect.bottom);
-
-                /* Display the strings */
-                if (hFont1) NtGdiSelectFont(hDC, hFont1);
-                for (i = 0; i < ARRAYSIZE(VerStrs); ++i)
-                {
-                    if (!VerStrs[i].lpstr || !*VerStrs[i].lpstr || (VerStrs[i].n == 0))
-                        break;
-
-                    TotalHeight -= VerStrs[i].y;
-                    GreExtTextOutW(hDC,
-                                   Rect.right - 5,
-                                   Rect.bottom - TotalHeight - 5,
-                                   0, NULL,
-                                   VerStrs[i].lpstr,
-                                   VerStrs[i].n,
-                                   NULL, 0);
-
-                    /* While the first string was using hFont1, all the others use hFont2 */
-                    if (hFont2) NtGdiSelectFont(hDC, hFont2);
-                }
-            }
-            else
-            {
-                if (hFont1) NtGdiSelectFont(hDC, hFont1);
-
-                /* Safe Mode: single version information text in top center */
-                len = wcslen(wszzVersion);
-
-                IntGdiSetTextAlign(hDC, TA_CENTER | TA_TOP);
-                GreExtTextOutW(hDC, (Rect.right + Rect.left)/2, Rect.top + 3, 0, NULL, wszzVersion, len, NULL, 0);
-                if (*s_wszAssistance)
-                {
-                    SIZE Size = {0, 0};
-
-                    GreGetTextExtentW(hDC, wszzVersion, (INT)len, &Size, 1);
-                    GreExtTextOutW(hDC, (Rect.right + Rect.left)/2, Rect.top + 3 + Size.cy, 0, NULL,
-                                   s_wszAssistance, lstrlenW(s_wszAssistance), NULL, 0);
-                }
+                GreGetTextExtentW(hDC, wszzVersion, (INT)len, &Size, 1);
+                GreExtTextOutW(hDC, (Rect.right + Rect.left)/2, Rect.top + 3 + Size.cy, 0, NULL,
+                               s_wszAssistance, lstrlenW(s_wszAssistance), NULL, 0);
             }
         }
 

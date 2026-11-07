@@ -106,6 +106,7 @@ struct taskbar_button
 static struct list taskbar_buttons = LIST_INIT( taskbar_buttons );
 
 static HWND tray_window;
+static HWINEVENTHOOK window_event_hook;
 
 static unsigned int nb_displayed;
 
@@ -157,6 +158,8 @@ static WNDCLASSEXW tray_icon_class =
 
 static void do_hide_systray(void);
 static void do_show_systray(void);
+static struct taskbar_button *find_taskbar_button( HWND hwnd );
+static void remove_taskbar_button( HWND hwnd );
 
 /* Retrieves icon record by owner window and ID */
 static struct icon *get_icon(HWND owner, UINT id)
@@ -956,13 +959,48 @@ static void add_taskbar_button( HWND hwnd )
     {
         DWORD process;
         if (!GetWindowThreadProcessId( hwnd, &process ) || process == GetCurrentProcessId()) return;
+        if (GetWindow( hwnd, GW_OWNER )) return;
     }
+
+    if (find_taskbar_button( hwnd )) return;
 
     if (!(win = malloc( sizeof(*win) ))) return;
     win->hwnd = hwnd;
     win->button = CreateWindowW( WC_BUTTONW, NULL, WS_CHILD | BS_OWNERDRAW,
                                  0, 0, 0, 0, tray_window, (HMENU)hwnd, 0, 0 );
     list_add_tail( &taskbar_buttons, &win->entry );
+}
+
+static void CALLBACK window_event_proc( HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                        LONG object, LONG child, DWORD process, DWORD thread )
+{
+    (void)hook;
+    (void)process;
+    (void)thread;
+
+    if (object != OBJID_WINDOW || child != CHILDID_SELF || !hwnd) return;
+
+    switch (event)
+    {
+    case EVENT_OBJECT_CREATE:
+        add_taskbar_button( hwnd );
+        break;
+    case EVENT_OBJECT_DESTROY:
+        remove_taskbar_button( hwnd );
+        break;
+    case EVENT_OBJECT_SHOW:
+    case EVENT_OBJECT_HIDE:
+    case EVENT_SYSTEM_FOREGROUND:
+        sync_taskbar_buttons();
+        break;
+    }
+}
+
+static BOOL CALLBACK enum_windows_proc( HWND hwnd, LPARAM lparam )
+{
+    (void)lparam;
+    add_taskbar_button( hwnd );
+    return TRUE;
 }
 
 static struct taskbar_button *find_taskbar_button( HWND hwnd )
@@ -1272,6 +1310,14 @@ void initialize_systray( BOOL arg_using_root, BOOL arg_enable_shell, BOOL arg_sh
 
     add_taskbar_button( 0 );
 
-    if (enable_taskbar) do_show_systray();
+    if (enable_taskbar)
+    {
+        EnumWindows( enum_windows_proc, 0 );
+        window_event_hook = SetWinEventHook( EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_HIDE, 0,
+                                             window_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT );
+        if (!window_event_hook)
+            WARN( "Could not install window event hook, error %lu\n", GetLastError() );
+        do_show_systray();
+    }
     else do_hide_systray();
 }

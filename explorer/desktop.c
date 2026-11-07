@@ -816,7 +816,7 @@ static LRESULT WINAPI desktop_wnd_proc( HWND hwnd, UINT message, WPARAM wp, LPAR
         return HTCLIENT;
 
     case WM_ERASEBKGND:
-        if (!using_root) PaintDesktop( (HDC)wp );
+        PaintDesktop( (HDC)wp );
         return TRUE;
 
     case WM_SETTINGCHANGE:
@@ -840,11 +840,9 @@ static LRESULT WINAPI desktop_wnd_proc( HWND hwnd, UINT message, WPARAM wp, LPAR
         {
             PAINTSTRUCT ps;
             BeginPaint( hwnd, &ps );
+            PaintDesktop( ps.hdc );
             if (!using_root)
-            {
-                PaintDesktop( ps.hdc );
                 draw_launchers( ps.hdc, ps.rcPaint );
-            }
             EndPaint( hwnd, &ps );
         }
         return 0;
