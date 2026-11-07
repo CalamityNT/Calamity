@@ -4,7 +4,6 @@ add_subdirectory(inf)
 add_subdirectory(nls)
 add_subdirectory(sdb)
 add_subdirectory(sounds)
-add_subdirectory(themes)
 add_subdirectory(winmetadata)
 
 add_cd_file(FILE ${CMAKE_CURRENT_SOURCE_DIR}/drivers/etc/hosts DESTINATION reactos/system32/drivers/etc FOR all)
