@@ -262,6 +262,50 @@ IsDesktopThemeActive(VOID)
     return Active;
 }
 
+static VOID
+ApplyClassicThemeDefault(VOID)
+{
+    HKEY Key;
+    WCHAR Applied[2];
+    DWORD Type = 0, Size = sizeof(Applied);
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ThemeManager",
+                      0,
+                      KEY_QUERY_VALUE | KEY_SET_VALUE,
+                      &Key) != ERROR_SUCCESS)
+    {
+        return;
+    }
+
+    if (RegQueryValueExW(Key,
+                         L"CalamityClassicDefaultApplied",
+                         NULL,
+                         &Type,
+                         (LPBYTE)Applied,
+                         &Size) == ERROR_FILE_NOT_FOUND)
+    {
+        static const WCHAR Disabled[] = L"0";
+        static const WCHAR AppliedValue[] = L"1";
+
+        RegSetValueExW(Key,
+                       L"ThemeActive",
+                       0,
+                       REG_SZ,
+                       (const BYTE *)Disabled,
+                       sizeof(Disabled));
+        RegDeleteValueW(Key, L"DllName");
+        RegSetValueExW(Key,
+                       L"CalamityClassicDefaultApplied",
+                       0,
+                       REG_SZ,
+                       (const BYTE *)AppliedValue,
+                       sizeof(AppliedValue));
+    }
+
+    RegCloseKey(Key);
+}
+
 static BOOL
 StartDesktopCompositor(
     _In_opt_ PVOID pEnvironment)
@@ -817,6 +861,7 @@ wWinMain(IN HINSTANCE hInst,
     hInstance = hInst;
 
     bIsLiveCD = IsLiveCD();
+    ApplyClassicThemeDefault();
     ApplyUserPowerScheme();
     SetUserSettings();
 
